@@ -1,0 +1,130 @@
+using namespace std;
+
+//bubble sorting algorithm
+void bubble_sort(float fAcc[], int size, float fX[], float fY[])
+//SPM main program
+int main(void)
+{
+//Read rainfall data
+  myfile.open("RAIN.DAT");
+  if (myfile.is_open()) 
+  {
+   myfile >> fTotalRain >>	fUnitArea >> fNoCell >> ISortNo >> cityname;
+  }
+  myfile.close();
+//Calculate total rainfall in terms of volume
+  fTotalVol=fTotalRain*fUnitArea*fUnitArea*fNoCell/1000;
+ // Call the matlab program to calculate the hydrological sequence
+PROCESS_INFORMATION ProcessInfo; 
+STARTUPINFO StartupInfo; 
+ZeroMemory(&StartupInfo, sizeof(StartupInfo));
+StartupInfo.cb = sizeof StartupInfo ; 
+if(CreateProcess(TEXT("SCA_Flood.exe"), NULL, 
+    NULL,NULL,FALSE,0,NULL,
+    NULL,&StartupInfo,&ProcessInfo))
+{ 
+    WaitForSingleObject(ProcessInfo.hProcess,INFINITE);
+    CloseHandle(ProcessInfo.hThread);
+    CloseHandle(ProcessInfo.hProcess);
+}  
+//Read data of x, y, flow accumulation, and elevation
+	myfile.open("ACCU.OUT");
+    if (myfile.is_open())	
+	  for (int i = 0; i<ISize; i++)
+	  {
+		  myfile >> fX[i] >> fY[i] >> fAcc[i]; 
+	   }	
+    myfile.close();
+
+//Find the smallest X & Y
+  float smallestX = 100000000.;
+  float smallestY = 100000000.;
+  float biggestX = 0.;
+  float biggestY = 0.;
+ 
+  for(int i = 0; i < ISize; i++)
+  {
+	  if (fY[i]< smallestY){
+		  smallestY = fY[i];}
+	  if (fY[i] > biggestY){
+			  biggestY = fY[i];}
+	  if (fX[i]< smallestX){
+		  smallestX = fX[i];}
+	      if (fX[i] > biggestX){
+			  biggestX = fX[i];}
+  }
+  // Apply bubble sorting technique to sort the flow accumulation
+bubble_sort(fAcc,ISize,fX,fY);
+  //Assign initial wet cells 
+    for(int i = 0; i < ISize; i++)
+  {
+	  if(i<ISortNo){
+		  INx=int((fX[i]-smallestX))/int(fUnitArea)+1;
+		  INy=int((fY[i]-smallestY))/int(fUnitArea)+1;
+		  fAccArray[INx][INy]=fAcc[i];
+		bWetCell_Ori[INx][INy] = true;
+		bWetCell_New[INx][INy] = true;
+	  }
+	  else
+	  {  
+	      INx=int((fX[i]-smallestX))/int(fUnitArea)+1;
+		  INy=int((fY[i]-smallestY))/int(fUnitArea)+1;
+		  fAccArray[INx][INy]=fAcc[i];
+		bWetCell_Ori[INx][INy] = false;
+		bWetCell_New[INx][INy] = false;
+	}
+	}
+	// Assign elevation to each cell based on DEM
+	myfile.open("Results.OUT");
+    if (myfile.is_open())	
+	  for (int i = 0; i<ISize; i++)
+	  {
+		  myfile >> fX[i] >> fY[i] >> fElev[i];
+	   }	
+    myfile.close();
+	 for(int i = 0; i < ISize; i++)
+  {
+	      INx=int((fX[i]-smallestX))/int(fUnitArea)+1;
+		  INy=int((fY[i]-smallestY))/int(fUnitArea)+1;
+		  fElevArray[INx][INy]=fElev[i];
+		  fWElev[INx][INy]=fElev[i];
+	}
+ cout << "SPM model is running..."<<endl;
+float fVDiff = -100.;  //Difference between observed volume and calculated volume
+  float fPercent = 1.;
+  float fDeltaH = 1./100.; //incremental flooding depth in meter
+  float fCalV;
+  float fDeltaV;
+     ofstream outputfile2;
+	outputfile2.open(filepath4, ofstream::out);
+//Calculate the total volume to match the input rainfall volume
+  	while((fPercent>1./10.) && (fVDiff<0.)){  
+/
+  fCalV=0.;
+    for(int i = 0; i < ISize; i++)
+  {
+	      INx=int((fX[i]-smallestX))/int(fUnitArea)+1;
+		  INy=int((fY[i]-smallestY))/int(fUnitArea)+1;
+		  		   if(bWetCell_New[INx][INy] == true){
+					   fDeltaV=fWElev[INx][INy]-fElevArray[INx][INy];
+		  fDeltaV=fDeltaV*fUnitArea*fUnitArea;
+		  fCalV=fCalV+fDeltaV;
+		   }
+	}
+   	fVDiff=fCalV-fTotalVol;
+	fPercent = abs (fVDiff)/fTotalVol;
+    cout<<fVDiff<<" "<<fPercent<<endl;
+	outputfile2<<fVDiff<<" "<<fPercent<<endl;
+	    for(int i = 1; i <= IMaxNx; i++)
+  {
+	  for(int j = 1; j <= IMaxNy; j++)
+	  {
+		 bWetCell_Ori[i][j]=bWetCell_New[i][j]; //update the wet grid
+	  }
+		}
+  } // while loop
+  outputfile2.close();
+   // Output results
+	system ("pause");
+	return 0;
+}
